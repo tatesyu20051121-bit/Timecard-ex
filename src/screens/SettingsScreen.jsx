@@ -11,6 +11,8 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   const [editPattern, setEditPattern] = useState(null)
   const [editBonusPattern, setEditBonusPattern] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteHasShifts, setDeleteHasShifts] = useState(false)
 
   // フォーム値
   const [wage, setWage] = useState(String(profile.hourly_rate))
@@ -63,6 +65,10 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
     const rate = parseInt(wage)
     if (isNaN(rate) || rate < 0) return
     if (!wageEffectiveDate) return
+    if (wageHistory.length >= 6) {
+      alert('時給の設定は最大6件まで登録できます')
+      return
+    }
     const duplicate = wageHistory.find(w => w.effective_date === wageEffectiveDate)
     if (duplicate) {
       alert(`${wageEffectiveDate} は既に登録されています。別の日付を選択してください。`)
@@ -85,16 +91,30 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
     setSheet(null)
   }
 
-  async function deleteWageHistory(entry) {
-    if (!window.confirm(`${fmtWageDate(entry.effective_date)} ¥${entry.hourly_rate.toLocaleString()} を削除しますか？`)) return
-    await supabase.from('wage_history').delete().eq('id', entry.id)
-    const remaining = wageHistory.filter(w => w.id !== entry.id)
+  async function handleDeleteWageClick(entry) {
+    const sorted = [...wageHistory].sort((a, b) => a.effective_date.localeCompare(b.effective_date))
+    const idx = sorted.findIndex(w => w.id === entry.id)
+    const nextEntry = sorted[idx + 1]
+    let query = supabase.from('time_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', session.user.id)
+      .gte('date', entry.effective_date)
+    if (nextEntry) query = query.lt('date', nextEntry.effective_date)
+    const { count } = await query
+    setDeleteTarget(entry)
+    setDeleteHasShifts(count > 0)
+  }
+
+  async function confirmDeleteWage() {
+    await supabase.from('wage_history').delete().eq('id', deleteTarget.id)
+    const remaining = wageHistory.filter(w => w.id !== deleteTarget.id)
     if (remaining.length > 0) {
       const latest = remaining.reduce((a, b) => a.effective_date > b.effective_date ? a : b)
       await supabase.from('profiles').update({ hourly_rate: latest.hourly_rate }).eq('id', session.user.id)
       await onProfileUpdated()
     }
     await onWageHistoryUpdated()
+    setDeleteTarget(null)
   }
 
   function fmtWageDate(d) {
@@ -250,7 +270,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           {sortedWageHistory.map(w => (
             <div key={w.id} className="settings-row"
               style={{ paddingLeft: 20, background: 'var(--surface-secondary, #f8f8f8)' }}
-              onClick={() => deleteWageHistory(w)}>
+              onClick={() => handleDeleteWageClick(w)}>
               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{fmtWageDate(w.effective_date)}</span>
               <div className="settings-row-right">
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>¥{w.hourly_rate.toLocaleString()}</span>
@@ -336,7 +356,13 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           </div>
           <div className="form-field">
             <label className="form-label">適用開始日</label>
-            <input type="date" value={wageEffectiveDate} onChange={e => setWageEffectiveDate(e.target.value)} />
+            <input
+              type="date"
+              value={wageEffectiveDate}
+              onChange={e => setWageEffectiveDate(e.target.value)}
+              min={`${new Date().getFullYear() - 3}-01-01`}
+              max={`${new Date().getFullYear() + 3}-12-31`}
+            />
           </div>
           <div className="form-field">
             <label className="form-label">時給（円）</label>
@@ -521,6 +547,33 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
             <button className="btn btn-primary" onClick={saveAccount} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
           </div>
         </BottomSheet>
+      )}
+
+      {/* 時給削除確認ダイアログ */}
+      {deleteTarget && (
+        <div className="popup-overlay">
+          <div className="popup" style={{ width: 300 }}>
+            {deleteHasShifts && (
+              <div style={{
+                background: '#e0f7fa', border: '1px solid #4dd0e1',
+                borderRadius: 8, padding: '10px 12px', marginBottom: 14,
+                fontSize: 12, color: '#006064', textAlign: 'left', lineHeight: 1.6
+              }}>
+                ⚠️ この時給で勤務していた日があります。削除してもよろしいですか？（時給が設定されていないシフトは、給与メニューの月ごとの振り込み予定額に加算されません）
+              </div>
+            )}
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+              {fmtWageDate(deleteTarget.effective_date)}
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 20 }}>
+              ¥{deleteTarget.hourly_rate.toLocaleString()} を削除しますか？
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>キャンセル</button>
+              <button className="btn btn-danger" onClick={confirmDeleteWage}>削除する</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

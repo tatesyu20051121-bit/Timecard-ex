@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase.js'
 import BottomSheet from '../components/BottomSheet.jsx'
 import {
   currentYearMonth, prevMonth, nextMonth, getMonthCalendar,
-  formatDate, formatYearMonth, minutesToDisplay, calcDayPay, today
+  formatDate, formatYearMonth, minutesToDisplay, calcDayPay, today,
+  getWageForDate, isJapaneseHoliday
 } from '../lib/timeUtils.js'
 
 export default function CalendarScreen({ session, profile, wageHistory }) {
@@ -204,39 +205,83 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
     setEditFields(prev => ({ ...prev, [key]: '' }))
   }
 
-  const weekdays = ['月', '火', '水', '木', '金', '土', '日']
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土']
+
+  const nowYear = new Date().getFullYear()
+  const minYearMonth = `${nowYear - 3}-01`
+  const maxYearMonth = `${nowYear + 3}-12`
+
+  function goToPrev() {
+    const prev = prevMonth(yearMonth)
+    if (prev >= minYearMonth) setYearMonth(prev)
+  }
+  function goToNext() {
+    const next = nextMonth(yearMonth)
+    if (next <= maxYearMonth) setYearMonth(next)
+  }
 
   return (
     <>
       <div className="screen calendar-screen">
         <div className="cal-month-nav">
-          <button onClick={() => setYearMonth(prevMonth(yearMonth))}>◀</button>
+          <button onClick={goToPrev} disabled={prevMonth(yearMonth) < minYearMonth}>◀</button>
           <span className="cal-month-label">{formatYearMonth(yearMonth)}</span>
-          <button onClick={() => setYearMonth(nextMonth(yearMonth))}>▶</button>
+          <button onClick={goToNext} disabled={nextMonth(yearMonth) > maxYearMonth}>▶</button>
         </div>
 
         <div className="cal-weekdays">
-          {weekdays.map(d => <div key={d} className="cal-weekday">{d}</div>)}
+          {weekdays.map((d, i) => (
+            <div key={d} className="cal-weekday" style={{ color: i === 0 ? '#e53935' : i === 6 ? '#1565c0' : undefined }}>
+              {d}
+            </div>
+          ))}
         </div>
 
         <div className="cal-days">
-          {days.map((day, i) => {
-            if (!day) return <div key={`empty-${i}`} />
+          {days.map((day) => {
             const rec = records[day.date]
             const isWorked = !!rec && (rec.clock_in || rec.clock_out)
-            const isIncomplete = !!rec && ((rec.clock_in && !rec.clock_out) || (rec.break_start && !rec.break_end))
+            const isIncomplete = isWorked && ((rec.clock_in && !rec.clock_out) || (rec.break_start && !rec.break_end))
+            const isNoWage = isWorked && !isIncomplete && wageHistory.length > 0 && getWageForDate(wageHistory, day.date) === null
             const isSelected = day.date === selectedDate
             const isToday = day.date === todayStr
+            const isHoliday = isJapaneseHoliday(day.date)
+            const dayOfWeek = new Date(day.date + 'T00:00:00').getDay()
+            const isSunday = dayOfWeek === 0
+            const isSaturday = dayOfWeek === 6
+
             let cls = 'cal-cell'
             if (isSelected) cls += ' selected'
             else if (isIncomplete) cls += ' incomplete'
+            else if (isNoWage) cls += ' no-wage'
             else if (isWorked) cls += ' worked'
-            else if (isToday) cls += ' today'
+            if (isToday && !isSelected) cls += ' today'
+            if (day.otherMonth) cls += ' other-month'
+
+            // 数字の色: 選択中は白、祝日・日曜は赤、土曜は青
+            let numColor
+            if (isSelected) numColor = undefined  // CSS で white に
+            else if (isHoliday || isSunday) numColor = '#e53935'
+            else if (isSaturday) numColor = '#1565c0'
+
             return (
-              <div key={day.date} className={cls} onClick={() => {
-                if (day.date === selectedDate) openTimeEdit()
-                else setSelectedDate(day.date)
-              }}>
+              <div
+                key={day.date}
+                className={cls}
+                style={numColor ? { color: numColor } : undefined}
+                onClick={() => {
+                  if (day.otherMonth) {
+                    // 前後月の日付をタップ→その月に移動して選択
+                    const [y, m] = day.date.split('-')
+                    setYearMonth(`${y}-${m}`)
+                    setSelectedDate(day.date)
+                  } else if (day.date === selectedDate) {
+                    openTimeEdit()
+                  } else {
+                    setSelectedDate(day.date)
+                  }
+                }}
+              >
                 {day.day}
               </div>
             )

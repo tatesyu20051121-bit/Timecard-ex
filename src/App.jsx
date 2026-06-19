@@ -156,19 +156,20 @@ export default function App() {
       zIndex: 50, fontFamily: 'monospace', fontSize: '11px',
     }}>
       <div style={{
-        background: 'rgba(180,0,0,0.9)', color: '#fff',
+        background: 'rgba(92,60,0,0.85)', color: '#ffe082',
         padding: '6px 10px', lineHeight: '1.4', pointerEvents: 'none'
       }}>
         {errorLogs.map((l, i) => <div key={i}>{l}</div>)}
       </div>
       <div style={{
-        background: 'rgba(120,0,0,0.95)', color: '#ffd', fontFamily: 'sans-serif',
+        background: '#fff8e1', color: '#5d4200', fontFamily: 'sans-serif',
+        border: '1px solid #f0c040',
         padding: '10px 14px', fontSize: '12px', lineHeight: '1.8', textAlign: 'center'
       }}>
-        大変申し訳ございません。エラーが起きてしまいました。<br />
-        この画面をスクリーンショットして、<br />
-        <span style={{ fontWeight: 700 }}>jefuni20260530@gmail.com</span> にメールで送信してください。<br />
-        その際に、どのような操作でエラーが発生したのかを<br />一緒に書いていただけると幸いです。
+        大変申し訳ございません。エラーが起きてしまいました。
+        この画面をスクリーンショットして、
+        <span style={{ fontWeight: 700 }}>jefuni20260530@gmail.com</span> にメールで送信してください。
+        その際に、どのような操作でエラーが発生したのかを一緒に書いていただけると幸いです。
       </div>
     </div>
   )

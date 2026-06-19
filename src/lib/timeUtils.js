@@ -64,8 +64,65 @@ export function getWageForDate(wageHistory, date) {
   // その日付以前で最新のエントリを探す
   const applicable = sorted.find(w => w.effective_date <= date)
   if (applicable) return applicable.hourly_rate
-  // 全エントリがその日付より後の場合は最も古いエントリを使用
-  return sorted[sorted.length - 1].hourly_rate
+  // 全エントリがその日付より後の場合はnull（設定前の日付）
+  return null
+}
+
+// 指定年の日本の祝日セットを構築
+function nthWeekday(year, month, n, dow) {
+  const d = new Date(year, month - 1, 1)
+  let cnt = 0
+  while (d.getMonth() === month - 1) {
+    if (d.getDay() === dow) { cnt++; if (cnt === n) return d.getDate() }
+    d.setDate(d.getDate() + 1)
+  }
+  return null
+}
+
+function buildHolidaySet(year) {
+  const list = []
+  const add = (m, d) => { if (d != null) list.push(`${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`) }
+
+  add(1, 1);   add(2, 11);  add(2, 23);  add(4, 29)
+  add(5, 3);   add(5, 4);   add(5, 5);   add(8, 11)
+  add(11, 3);  add(11, 23)
+
+  add(1, nthWeekday(year, 1, 2, 1))
+  add(7, nthWeekday(year, 7, 3, 1))
+  add(9, nthWeekday(year, 9, 3, 1))
+  add(10, nthWeekday(year, 10, 2, 1))
+
+  const shunbun = { 2023: 21, 2024: 20, 2025: 20, 2026: 20, 2027: 21, 2028: 20, 2029: 20, 2030: 20 }
+  const shubun  = { 2023: 23, 2024: 22, 2025: 23, 2026: 23, 2027: 23, 2028: 22, 2029: 23, 2030: 23 }
+  if (shunbun[year]) add(3, shunbun[year])
+  if (shubun[year])  add(9, shubun[year])
+
+  const set = new Set(list)
+  // 振替休日（祝日が日曜→翌月曜）
+  const extras = []
+  set.forEach(s => {
+    const d = new Date(s + 'T00:00:00')
+    if (d.getDay() === 0) {
+      const next = new Date(d)
+      next.setDate(next.getDate() + 1)
+      let nextStr = next.toISOString().slice(0, 10)
+      while (set.has(nextStr) || extras.includes(nextStr)) {
+        next.setDate(next.getDate() + 1)
+        nextStr = next.toISOString().slice(0, 10)
+      }
+      extras.push(nextStr)
+    }
+  })
+  extras.forEach(s => set.add(s))
+  return set
+}
+
+const _holidayCache = {}
+export function isJapaneseHoliday(dateStr) {
+  if (!dateStr) return false
+  const year = parseInt(dateStr.slice(0, 4))
+  if (!_holidayCache[year]) _holidayCache[year] = buildHolidaySet(year)
+  return _holidayCache[year].has(dateStr)
 }
 
 // 1日の給与計算
@@ -77,13 +134,35 @@ export function calcDayPay(record, settings, wageHistory = null) {
   let { hourly_rate, night_start = '22:00', night_end = '05:00', night_rate = 1.25 } = settings
 
   // wage_historyがある場合は対応日の時給を使用
+  let hasWage = true
   if (wageHistory && record.date) {
     const rateForDate = getWageForDate(wageHistory, record.date)
-    if (rateForDate !== null) hourly_rate = rateForDate
+    if (rateForDate !== null) {
+      hourly_rate = rateForDate
+    } else if (wageHistory.length > 0) {
+      // wage_historyはあるが対応する時給が見つからない（設定前の日付）
+      hasWage = false
+    }
   }
 
   if (!clock_in || !clock_out) {
-    return { workMinutes: 0, nightMinutes: 0, regularMinutes: 0, pay: 0, nightBonus: 0, transportFee: transport_fee || 0, bonusFee: bonus_fee || 0, totalPay: (transport_fee || 0) + (bonus_fee || 0) }
+    return { workMinutes: 0, nightMinutes: 0, regularMinutes: 0, pay: 0, nightBonus: 0, transportFee: transport_fee || 0, bonusFee: bonus_fee || 0, totalPay: (transport_fee || 0) + (bonus_fee || 0), hasWage }
+  }
+
+  // 時給未設定の場合は給与0
+  if (!hasWage) {
+    const inMin = timeToMinutes(clock_in)
+    let outMin = timeToMinutes(clock_out)
+    if (outMin < inMin) outMin += 24 * 60
+    let breakMinutes = 0
+    if (break_start && break_end) {
+      const bsMin = timeToMinutes(break_start)
+      let beMin = timeToMinutes(break_end)
+      if (beMin < bsMin) beMin += 24 * 60
+      breakMinutes = beMin - bsMin
+    }
+    const totalWorkMinutes = Math.max(0, outMin - inMin - breakMinutes)
+    return { workMinutes: totalWorkMinutes, nightMinutes: 0, regularMinutes: totalWorkMinutes, pay: 0, nightBonus: 0, transportFee: transport_fee || 0, bonusFee: bonus_fee || 0, totalPay: (transport_fee || 0) + (bonus_fee || 0), hasWage: false }
   }
 
   const inMin = timeToMinutes(clock_in)
@@ -125,6 +204,7 @@ export function calcDayPay(record, settings, wageHistory = null) {
     transportFee: transport_fee || 0,
     bonusFee,
     totalPay,
+    hasWage: true,
   }
 }
 
@@ -138,6 +218,7 @@ export function calcMonthPay(records, settings, wageHistory = null) {
   let totalNightBonus = 0
   let totalBonus = 0
   let workDays = 0
+  let daysWithoutWage = 0
 
   records.forEach(r => {
     const result = calcDayPay(r, settings, wageHistory)
@@ -147,7 +228,10 @@ export function calcMonthPay(records, settings, wageHistory = null) {
     totalTransport += result.transportFee
     totalNightBonus += result.nightBonus || 0
     totalBonus += result.bonusFee || 0
-    if (result.workMinutes > 0) workDays++
+    if (result.workMinutes > 0) {
+      workDays++
+      if (result.hasWage === false) daysWithoutWage++
+    }
   })
 
   return {
@@ -159,6 +243,7 @@ export function calcMonthPay(records, settings, wageHistory = null) {
     totalNightBonus,
     totalBonus,
     grandTotal: totalPay + totalTransport + totalBonus,
+    daysWithoutWage,
   }
 }
 
@@ -193,23 +278,47 @@ export function addMinutes(timeStr, delta) {
   return minutesToTime(clamped)
 }
 
-// 月のカレンダー情報を生成
+// 月のカレンダー情報を生成（日曜始まり、前後月の日付も含む）
 export function getMonthCalendar(yearMonth) {
   const [year, month] = yearMonth.split('-').map(Number)
   const firstDay = new Date(year, month - 1, 1)
   const lastDay = new Date(year, month, 0)
 
-  let startOffset = firstDay.getDay() - 1
-  if (startOffset < 0) startOffset = 6
+  // 0=日曜始まり（日曜が0なのでそのまま使用）
+  const startOffset = firstDay.getDay()
 
   const days = []
-  for (let i = 0; i < startOffset; i++) {
-    days.push(null)
+
+  // 前月の日付（1日が日曜=0の場合は前月不要）
+  if (startOffset > 0) {
+    const prevLastDay = new Date(year, month - 1, 0)
+    const prevYear = month === 1 ? year - 1 : year
+    const prevMonthNum = month === 1 ? 12 : month - 1
+    for (let i = startOffset - 1; i >= 0; i--) {
+      const d = prevLastDay.getDate() - i
+      const date = `${prevYear}-${String(prevMonthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      days.push({ date, day: d, otherMonth: true })
+    }
   }
+
+  // 当月の日付
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const date = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    days.push({ date, day: d })
+    days.push({ date, day: d, otherMonth: false })
   }
+
+  // 翌月の日付（最終週を埋める）
+  const remainder = days.length % 7
+  if (remainder !== 0) {
+    const nextYear = month === 12 ? year + 1 : year
+    const nextMonthNum = month === 12 ? 1 : month + 1
+    const toAdd = 7 - remainder
+    for (let d = 1; d <= toAdd; d++) {
+      const date = `${nextYear}-${String(nextMonthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      days.push({ date, day: d, otherMonth: true })
+    }
+  }
+
   return { year, month, days }
 }
 

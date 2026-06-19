@@ -2,7 +2,7 @@ export default function BottomNav({ tab, setTab }) {
   const items = [
     { key: 'clock',    icon: '🕐', label: '打刻' },
     { key: 'calendar', icon: '📅', label: '履歴' },
-    { key: 'salary',   icon: '💴', label: '給与' },
+    { key: 'salary',   icon: '🪙', label: '給与' },
     { key: 'settings', icon: '⚙️', label: '設定' },
   ]
   return (

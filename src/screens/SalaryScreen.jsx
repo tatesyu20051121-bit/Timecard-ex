@@ -58,6 +58,19 @@ export default function SalaryScreen({ session, profile, wageHistory }) {
         <div className="no-data">この月の勤務記録はありません</div>
       ) : (
         <>
+          {/* 時給未設定の警告 */}
+          {result.daysWithoutWage > 0 && (
+            <div style={{
+              background: '#e0f7fa', border: '1px solid #4dd0e1',
+              borderRadius: 10, padding: '10px 14px', marginBottom: 12,
+              display: 'flex', alignItems: 'center', gap: 8
+            }}>
+              <span>⚠️</span>
+              <span style={{ fontSize: 13, color: '#006064', fontWeight: 500 }}>
+                時給が設定されていない勤務日があります
+              </span>
+            </div>
+          )}
           {/* 不完全記録の警告 */}
           {incompleteRecords.length > 0 && (
             <div style={{
