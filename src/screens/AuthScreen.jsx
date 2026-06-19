@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
-const APP_URL = 'https://sensational-gnome-babb83.netlify.app'
+const APP_URL = 'https://tatesyu20051121-bit.github.io/Timecard-ex'
 
 export default function AuthScreen({ firstSetup, session, onProfileCreated }) {
   const [loading, setLoading] = useState(false)
