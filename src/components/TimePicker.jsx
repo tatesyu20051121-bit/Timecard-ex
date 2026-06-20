@@ -41,6 +41,8 @@ function PickerCol({ items, initialIndex, onSelect }) {
         width: 80,
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
+        position: 'relative',
+        zIndex: 1,
       }}
     >
       {/* 上パディング */}
