@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 const ITEM_H = 44
 const VISIBLE = 5
@@ -80,7 +81,7 @@ export default function TimePicker({ value, onConfirm, onCancel }) {
   const hours = Array.from({ length: 24 }, (_, i) => i)
   const minutes = Array.from({ length: 60 }, (_, i) => i)
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -160,6 +161,7 @@ export default function TimePicker({ value, onConfirm, onCancel }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
