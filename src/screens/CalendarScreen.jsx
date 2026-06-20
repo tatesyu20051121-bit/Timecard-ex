@@ -272,10 +272,9 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
                 style={numColor ? { color: numColor } : undefined}
                 onClick={() => {
                   if (day.otherMonth) {
-                    // 前後月の日付をタップ→その月に移動して選択
-                    const [y, m] = day.date.split('-')
-                    setYearMonth(`${y}-${m}`)
+                    // 月表示は変えず、その日を選択して編集を開く
                     setSelectedDate(day.date)
+                    openTimeEdit()
                   } else if (day.date === selectedDate) {
                     openTimeEdit()
                   } else {

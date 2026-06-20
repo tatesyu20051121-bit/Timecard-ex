@@ -129,6 +129,9 @@ html, body {
 }
 .sheet-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; flex-shrink: 0; }
 
+/* ドラムピッカーのスクロールバーを非表示 */
+.picker-col::-webkit-scrollbar { display: none; }
+
 /* ── ポップアップ ── */
 .popup-overlay {
   position: fixed;
