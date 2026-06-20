@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import BottomSheet from '../components/BottomSheet.jsx'
+import TimeInput from '../components/TimeInput.jsx'
 import {
   currentYearMonth, prevMonth, nextMonth, getMonthCalendar,
   formatDate, formatYearMonth, minutesToDisplay, calcDayPay, today,
@@ -20,8 +21,6 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
   const [freeTransport, setFreeTransport] = useState('')
   const [freeBonus, setFreeBonus] = useState('')
   const [saving, setSaving] = useState(false)
-  const inputOriginals = useRef({})
-  const inputChanged = useRef({})
 
   const todayStr = today()
 
@@ -492,27 +491,9 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
                 <div key={f.key} className="time-field form-field">
                   <label className="form-label">{f.label}</label>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      type="time"
+                    <TimeInput
                       value={editFields[f.key] || ''}
-                      min={minVal}
-                      onFocus={() => {
-                        inputOriginals.current[f.key] = editFields[f.key] || ''
-                        inputChanged.current[f.key] = false
-                      }}
-                      onChange={e => {
-                        inputChanged.current[f.key] = true
-                        setEditFields(prev => ({ ...prev, [f.key]: e.target.value }))
-                      }}
-                      onBlur={e => {
-                        const val = e.target.value
-                        const original = inputOriginals.current[f.key] || ''
-                        // リセット（値が空になった）か、外側タップ（changeなし）→元の値に戻す
-                        if (!inputChanged.current[f.key] || val === '') {
-                          setEditFields(prev => ({ ...prev, [f.key]: original }))
-                        }
-                      }}
-                      style={{ flex: 1 }}
+                      onChange={val => setEditFields(prev => ({ ...prev, [f.key]: val }))}
                     />
                     <button
                       type="button"
