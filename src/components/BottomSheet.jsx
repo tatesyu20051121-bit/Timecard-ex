@@ -1,54 +1,58 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export default function BottomSheet({ title, onClose, children }) {
-  const [dragY, setDragY] = useState(0)
+  const dragY = useRef(0)
+  const [dragYState, setDragYState] = useState(0)
   const startY = useRef(null)
-  const startX = useRef(null)
   const dragging = useRef(false)
-  const isVertical = useRef(null) // null=未判定, true=縦, false=横
+  const handleRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
-  function handleTouchStart(e) {
-    startY.current = e.touches[0].clientY
-    startX.current = e.touches[0].clientX
-    dragging.current = true
-    isVertical.current = null
-    setDragY(0)
-  }
+  useEffect(() => {
+    const el = handleRef.current
+    if (!el) return
 
-  function handleTouchMove(e) {
-    if (!dragging.current) return
-    const deltaY = e.touches[0].clientY - startY.current
-    const deltaX = Math.abs(e.touches[0].clientX - startX.current)
-
-    // 最初の動きで縦か横かを判定（4px以上動いた時点で決定）
-    if (isVertical.current === null && (Math.abs(deltaY) > 4 || deltaX > 4)) {
-      isVertical.current = Math.abs(deltaY) >= deltaX
+    function onStart(e) {
+      startY.current = e.touches[0].clientY
+      dragging.current = true
+      dragY.current = 0
+      setDragYState(0)
     }
 
-    // 横スワイプは無視
-    if (isVertical.current === false) return
-
-    if (deltaY > 0 && isVertical.current) {
-      e.preventDefault()
-      setDragY(deltaY)
+    function onMove(e) {
+      if (!dragging.current) return
+      const delta = e.touches[0].clientY - startY.current
+      if (delta > 0) {
+        e.preventDefault()
+        dragY.current = delta
+        setDragYState(delta)
+      }
     }
-  }
 
-  function handleTouchEnd() {
-    dragging.current = false
-    if (dragY > 100) {
-      onClose()
-    } else {
-      setDragY(0)
+    function onEnd() {
+      dragging.current = false
+      if (dragY.current > 100) {
+        onCloseRef.current()
+      }
+      dragY.current = 0
+      setDragYState(0)
+      startY.current = null
     }
-    startY.current = null
-    startX.current = null
-    isVertical.current = null
-  }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, [])
 
   const sheetStyle = {
-    transform: dragY > 0 ? `translateY(${dragY}px)` : 'translateY(0)',
-    transition: dragY === 0 ? 'transform 0.25s ease' : 'none',
+    transform: dragYState > 0 ? `translateY(${dragYState}px)` : 'translateY(0)',
+    transition: dragYState === 0 ? 'transform 0.25s ease' : 'none',
   }
 
   return (
@@ -56,20 +60,20 @@ export default function BottomSheet({ title, onClose, children }) {
       className="sheet-overlay"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div
-        className="sheet"
-        style={sheetStyle}
-        onTouchMove={e => e.stopPropagation()}
-      >
+      <div className="sheet" style={sheetStyle}>
+        {/* ドラッグハンドル — タッチ判定を広めに */}
         <div
-          className="sheet-handle"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          style={{ cursor: 'grab', paddingTop: 12, paddingBottom: 8 }}
-        />
+          ref={handleRef}
+          className="sheet-handle-area"
+          style={{ touchAction: 'none' }}
+        >
+          <div className="sheet-handle" />
+        </div>
         {title && <div className="sheet-title">{title}</div>}
-        {children}
+        {/* コンテンツエリアだけスクロール — sheet本体は動かない */}
+        <div className="sheet-body">
+          {children}
+        </div>
       </div>
     </div>
   )
