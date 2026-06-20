@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase.js'
 import BottomSheet from '../components/BottomSheet.jsx'
 import {
@@ -20,6 +20,8 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
   const [freeTransport, setFreeTransport] = useState('')
   const [freeBonus, setFreeBonus] = useState('')
   const [saving, setSaving] = useState(false)
+  const inputOriginals = useRef({})
+  const inputChanged = useRef({})
 
   const todayStr = today()
 
@@ -291,38 +293,68 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
         <div className="cal-detail">
           <div className="cal-detail-title">{formatDate(selectedDate)}</div>
 
-          {record?.clock_in || record?.clock_out ? (
-            <>
-              <div className="detail-row">
-                <span className="detail-label">出退勤</span>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span className="detail-value">
-                    {record.clock_in || '--:--'} → {record.clock_out || '--:--'}
-                  </span>
-                  <button className="detail-edit-btn" onClick={openTimeEdit}>編集</button>
-                </div>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">休憩</span>
-                <span className="detail-value">
-                  {record.break_start && record.break_end
-                    ? `${record.break_start}〜${record.break_end}`
-                    : '---'}
-                </span>
-              </div>
-              {dayCalc && (
+          {(() => {
+            const hasClockData = record?.clock_in || record?.clock_out
+            const hasBreakOnly = !hasClockData && (record?.break_start || record?.break_end)
+            if (hasClockData) {
+              return (
+                <>
+                  <div className="detail-row">
+                    <span className="detail-label">出退勤</span>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span className="detail-value">
+                        {record.clock_in || '--:--'} → {record.clock_out || '--:--'}
+                      </span>
+                      <button className="detail-edit-btn" onClick={openTimeEdit}>編集</button>
+                    </div>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">休憩</span>
+                    <span className="detail-value">
+                      {record.break_start && record.break_end
+                        ? `${record.break_start}〜${record.break_end}`
+                        : '---'}
+                    </span>
+                  </div>
+                  {dayCalc && (
+                    <div className="detail-row">
+                      <span className="detail-label">労働時間</span>
+                      <span className="detail-value">{minutesToDisplay(dayCalc.workMinutes)}</span>
+                    </div>
+                  )}
+                </>
+              )
+            } else if (hasBreakOnly) {
+              return (
+                <>
+                  <div className="detail-row">
+                    <span className="detail-label">出退勤</span>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span className="detail-value">--:-- → --:--</span>
+                      <button className="detail-edit-btn" onClick={openTimeEdit}>編集</button>
+                    </div>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">休憩</span>
+                    <span className="detail-value">
+                      {`${record.break_start || '--:--'}〜${record.break_end || '--:--'}`}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">労働時間</span>
+                    <span className="detail-value">---</span>
+                  </div>
+                </>
+              )
+            } else {
+              return (
                 <div className="detail-row">
-                  <span className="detail-label">労働時間</span>
-                  <span className="detail-value">{minutesToDisplay(dayCalc.workMinutes)}</span>
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>この日の記録はありません</span>
+                  <button className="detail-edit-btn" onClick={openTimeEdit}>追加</button>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="detail-row">
-              <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>この日の記録はありません</span>
-              <button className="detail-edit-btn" onClick={openTimeEdit}>追加</button>
-            </div>
-          )}
+              )
+            }
+          })()}
 
           {/* 交通費 */}
           <div className="detail-row">
@@ -464,7 +496,22 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
                       type="time"
                       value={editFields[f.key] || ''}
                       min={minVal}
-                      onChange={e => setEditFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      onFocus={() => {
+                        inputOriginals.current[f.key] = editFields[f.key] || ''
+                        inputChanged.current[f.key] = false
+                      }}
+                      onChange={e => {
+                        inputChanged.current[f.key] = true
+                        setEditFields(prev => ({ ...prev, [f.key]: e.target.value }))
+                      }}
+                      onBlur={e => {
+                        const val = e.target.value
+                        const original = inputOriginals.current[f.key] || ''
+                        // リセット（値が空になった）か、外側タップ（changeなし）→元の値に戻す
+                        if (!inputChanged.current[f.key] || val === '') {
+                          setEditFields(prev => ({ ...prev, [f.key]: original }))
+                        }
+                      }}
                       style={{ flex: 1 }}
                     />
                     <button
