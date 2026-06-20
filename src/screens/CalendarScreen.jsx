@@ -271,11 +271,7 @@ export default function CalendarScreen({ session, profile, wageHistory }) {
                 className={cls}
                 style={numColor ? { color: numColor } : undefined}
                 onClick={() => {
-                  if (day.otherMonth) {
-                    // 月表示は変えず、その日を選択して編集を開く
-                    setSelectedDate(day.date)
-                    openTimeEdit()
-                  } else if (day.date === selectedDate) {
+                  if (day.date === selectedDate) {
                     openTimeEdit()
                   } else {
                     setSelectedDate(day.date)
