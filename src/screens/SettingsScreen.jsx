@@ -490,7 +490,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
 
       {/* 招待QRコードシート */}
       {sheet === 'qr' && (() => {
-        const APP_URL = 'https://sensational-gnome-babb83.netlify.app'
+        const APP_URL = 'https://tatesyu20051121-bit.github.io/Timecard-ex'
         const INVITE_TOKEN = import.meta.env.VITE_INVITE_TOKEN
         const inviteUrl = INVITE_TOKEN ? `${APP_URL}?invite=${INVITE_TOKEN}` : APP_URL
         const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`
