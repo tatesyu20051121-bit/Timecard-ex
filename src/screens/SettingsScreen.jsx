@@ -3,13 +3,14 @@ import { supabase } from '../lib/supabase.js'
 import BottomSheet from '../components/BottomSheet.jsx'
 import { today } from '../lib/timeUtils.js'
 
-export default function SettingsScreen({ session, profile, onProfileUpdated, wageHistory, onWageHistoryUpdated }) {
+export default function SettingsScreen({ session, profile, onProfileUpdated, wageHistory, onWageHistoryUpdated, specialWagePatterns, onSpecialWagePatternsUpdated }) {
   const [patterns, setPatterns] = useState([])
   const [bonusPatterns, setBonusPatterns] = useState([])
   const [history, setHistory] = useState([])
   const [sheet, setSheet] = useState(null)
   const [editPattern, setEditPattern] = useState(null)
   const [editBonusPattern, setEditBonusPattern] = useState(null)
+  const [editSpecialPattern, setEditSpecialPattern] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteHasShifts, setDeleteHasShifts] = useState(false)
@@ -28,6 +29,9 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   const [satNightEnabled, setSatNightEnabled] = useState(profile.sat_night_enabled !== false)
   const [sunNightEnabled, setSunNightEnabled] = useState(profile.sun_night_enabled !== false)
   const [holNightEnabled, setHolNightEnabled] = useState(profile.hol_night_enabled !== false)
+  const [specialPatternName, setSpecialPatternName] = useState('')
+  const [specialPatternRate, setSpecialPatternRate] = useState('')
+  const [specialPatternNight, setSpecialPatternNight] = useState(true)
   const [patternName, setPatternName] = useState('')
   const [patternFee, setPatternFee] = useState('')
   const [accountName, setAccountName] = useState(profile.name)
@@ -261,6 +265,53 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
     setSheet('bonus-pattern-edit')
   }
 
+  // 特別時給パターン
+  async function addSpecialPattern() {
+    const rate = parseInt(specialPatternRate)
+    if (!specialPatternName.trim() || isNaN(rate) || rate < 0) return
+    if ((specialWagePatterns || []).length >= 6) { alert('パターンは最大6個まで登録できます'); return }
+    setSaving(true)
+    await supabase.from('special_wage_patterns').insert({
+      user_id: session.user.id,
+      name: specialPatternName.trim(),
+      hourly_rate: rate,
+      night_enabled: specialPatternNight,
+    })
+    await onSpecialWagePatternsUpdated()
+    setSpecialPatternName(''); setSpecialPatternRate(''); setSpecialPatternNight(true)
+    setSaving(false)
+    setSheet(null)
+  }
+
+  async function updateSpecialPattern() {
+    const rate = parseInt(specialPatternRate)
+    if (!specialPatternName.trim() || isNaN(rate) || rate < 0) return
+    setSaving(true)
+    await supabase.from('special_wage_patterns').update({
+      name: specialPatternName.trim(),
+      hourly_rate: rate,
+      night_enabled: specialPatternNight,
+    }).eq('id', editSpecialPattern.id)
+    await onSpecialWagePatternsUpdated()
+    setSaving(false)
+    setSheet(null)
+  }
+
+  async function deleteSpecialPattern(id) {
+    if (!window.confirm('このパターンを削除しますか？')) return
+    await supabase.from('special_wage_patterns').delete().eq('id', id)
+    await onSpecialWagePatternsUpdated()
+    setSheet(null)
+  }
+
+  function openEditSpecialPattern(p) {
+    setEditSpecialPattern(p)
+    setSpecialPatternName(p.name)
+    setSpecialPatternRate(String(p.hourly_rate))
+    setSpecialPatternNight(p.night_enabled !== false)
+    setSheet('special-pattern-edit')
+  }
+
   async function handleLogout() {
     if (!window.confirm('ログアウトしますか？')) return
     await supabase.auth.signOut()
@@ -372,6 +423,26 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           </div>
         </div>
 
+        {/* 特別時給パターン */}
+        <div className="settings-section-label">特別時給パターン</div>
+        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '0 4px 8px', lineHeight: 1.6 }}>
+          特別時給はその日の通常時給・休日時給より優先されます。<br />優先順位：特別時給 ＞ 休日時給 ＞ 通常時給
+        </div>
+        <div className="settings-card">
+          {(specialWagePatterns || []).map(p => (
+            <div key={p.id} className="settings-row" onClick={() => openEditSpecialPattern(p)}>
+              <span className="settings-row-label">{p.name}</span>
+              <div className="settings-row-right">
+                <span className="settings-row-value">¥{p.hourly_rate.toLocaleString()}{p.night_enabled !== false ? '' : '　深夜なし'}</span>
+                <span className="settings-chevron">›</span>
+              </div>
+            </div>
+          ))}
+          <div className="settings-add-row" onClick={() => { setSpecialPatternName(''); setSpecialPatternRate(''); setSpecialPatternNight(true); setSheet('special-pattern-add') }}>
+            ＋ パターンを追加
+          </div>
+        </div>
+
         {/* その他 */}
         <div className="settings-section-label">その他</div>
         <div className="settings-card">
@@ -462,6 +533,9 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
       {/* 休日時給シート */}
       {sheet === 'holiday' && (
         <BottomSheet title="休日時給を設定" onClose={() => setSheet(null)}>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12, lineHeight: 1.6 }}>
+            優先順位：特別時給 ＞ 休日時給 ＞ 通常時給
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>休日時給を適用する</span>
             <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
@@ -616,6 +690,65 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           </div>
           <button className="btn btn-outline" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
             onClick={() => deleteBonusPattern(editBonusPattern.id)}>このパターンを削除する</button>
+        </BottomSheet>
+      )}
+
+      {/* 特別時給パターン追加シート */}
+      {sheet === 'special-pattern-add' && (
+        <BottomSheet title="特別時給パターンを追加" onClose={() => setSheet(null)}>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12, lineHeight: 1.6 }}>
+            特別時給はその日の通常時給・休日時給より優先されます。
+          </div>
+          <div className="form-field">
+            <label className="form-label">パターン名</label>
+            <input type="text" value={specialPatternName} onChange={e => setSpecialPatternName(e.target.value)} placeholder="例：他店ヘルプ" />
+          </div>
+          <div className="form-field">
+            <label className="form-label">時給（円）</label>
+            <input type="number" value={specialPatternRate} onChange={e => setSpecialPatternRate(e.target.value)} placeholder="例：1500" />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', marginBottom: 16 }}>
+            <span style={{ fontSize: 14 }}>深夜割増を適用する</span>
+            <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
+              <input type="checkbox" checked={specialPatternNight} onChange={e => setSpecialPatternNight(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+              <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: specialPatternNight ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
+                <span style={{ position: 'absolute', width: 22, height: 22, left: specialPatternNight ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
+              </span>
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-outline" onClick={() => setSheet(null)}>キャンセル</button>
+            <button className="btn btn-primary" onClick={addSpecialPattern} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* 特別時給パターン編集シート */}
+      {sheet === 'special-pattern-edit' && editSpecialPattern && (
+        <BottomSheet title="特別時給パターンを編集" onClose={() => setSheet(null)}>
+          <div className="form-field">
+            <label className="form-label">パターン名</label>
+            <input type="text" value={specialPatternName} onChange={e => setSpecialPatternName(e.target.value)} />
+          </div>
+          <div className="form-field">
+            <label className="form-label">時給（円）</label>
+            <input type="number" value={specialPatternRate} onChange={e => setSpecialPatternRate(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', marginBottom: 16 }}>
+            <span style={{ fontSize: 14 }}>深夜割増を適用する</span>
+            <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
+              <input type="checkbox" checked={specialPatternNight} onChange={e => setSpecialPatternNight(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+              <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: specialPatternNight ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
+                <span style={{ position: 'absolute', width: 22, height: 22, left: specialPatternNight ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
+              </span>
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+            <button className="btn btn-outline" onClick={() => setSheet(null)}>キャンセル</button>
+            <button className="btn btn-primary" onClick={updateSpecialPattern} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
+          </div>
+          <button className="btn btn-outline" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+            onClick={() => deleteSpecialPattern(editSpecialPattern.id)}>このパターンを削除する</button>
         </BottomSheet>
       )}
 

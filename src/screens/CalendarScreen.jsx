@@ -8,17 +8,22 @@ import {
   getWageForDate, isJapaneseHoliday
 } from '../lib/timeUtils.js'
 
-export default function CalendarScreen({ session, profile, wageHistory, yearMonth, setYearMonth }) {
+export default function CalendarScreen({ session, profile, wageHistory, specialWagePatterns, yearMonth, setYearMonth }) {
   const [records, setRecords] = useState({})
   const [patterns, setPatterns] = useState([])
   const [bonusPatterns, setBonusPatterns] = useState([])
   const [selectedDate, setSelectedDate] = useState(today())
   const [showTransport, setShowTransport] = useState(false)
   const [showBonus, setShowBonus] = useState(false)
+  const [showSpecialWage, setShowSpecialWage] = useState(false)
   const [showTimeEdit, setShowTimeEdit] = useState(false)
   const [editFields, setEditFields] = useState({})
   const [freeTransport, setFreeTransport] = useState('')
   const [freeBonus, setFreeBonus] = useState('')
+  const [freeSpecialRate, setFreeSpecialRate] = useState('')
+  const [freeSpecialNight, setFreeSpecialNight] = useState(true)
+  const [showSpecialNightPopup, setShowSpecialNightPopup] = useState(false)
+  const [pendingSpecialRate, setPendingSpecialRate] = useState(null)
   const [saving, setSaving] = useState(false)
 
   const todayStr = today()
@@ -141,6 +146,35 @@ export default function CalendarScreen({ session, profile, wageHistory, yearMont
     if (isNaN(fee) || fee < 0) return
     await selectBonus(null, fee)
     setFreeBonus('')
+  }
+
+  async function selectSpecialWage(patternId, rate, nightEnabled) {
+    setSaving(true)
+    await upsertRecord({ special_wage_id: patternId || null, special_hourly_rate: rate, special_night_enabled: nightEnabled })
+    setShowSpecialWage(false)
+    setSaving(false)
+  }
+
+  async function clearSpecialWage() {
+    setSaving(true)
+    await upsertRecord({ special_wage_id: null, special_hourly_rate: null, special_night_enabled: null })
+    setShowSpecialWage(false)
+    setSaving(false)
+  }
+
+  function submitFreeSpecialRate() {
+    const rate = parseInt(freeSpecialRate)
+    if (isNaN(rate) || rate < 0) return
+    setPendingSpecialRate(rate)
+    setShowSpecialNightPopup(true)
+  }
+
+  async function confirmFreeSpecial(nightEnabled) {
+    setShowSpecialNightPopup(false)
+    await selectSpecialWage(null, pendingSpecialRate, nightEnabled)
+    setFreeSpecialRate('')
+    setFreeSpecialNight(true)
+    setPendingSpecialRate(null)
   }
 
   async function saveTimeEdit() {
@@ -393,6 +427,26 @@ export default function CalendarScreen({ session, profile, wageHistory, yearMont
               )}
             </div>
           </div>
+
+          {/* 特別時給 */}
+          <div className="detail-row">
+            <span className="detail-label">特別時給</span>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {record?.special_hourly_rate != null ? (
+                <>
+                  <span className="transport-value">
+                    {record.special_wage_id
+                      ? ((specialWagePatterns || []).find(p => p.id === record.special_wage_id)?.name || '') + ' '
+                      : 'フリー '}
+                    ¥{record.special_hourly_rate.toLocaleString()}
+                  </span>
+                  <button className="change-link" onClick={() => { setFreeSpecialRate(''); setShowSpecialWage(true) }}>変更</button>
+                </>
+              ) : (
+                <button className="change-link" onClick={() => { setFreeSpecialRate(''); setShowSpecialWage(true) }}>選択</button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -476,6 +530,71 @@ export default function CalendarScreen({ session, profile, wageHistory, yearMont
             </button>
           </div>
         </BottomSheet>
+      )}
+
+      {/* 特別時給選択シート */}
+      {showSpecialWage && (
+        <BottomSheet title="特別時給を選択" onClose={() => { setShowSpecialWage(false); setFreeSpecialRate('') }}>
+          <div
+            className={`transport-option${record?.special_hourly_rate == null ? ' selected' : ''}`}
+            onClick={clearSpecialWage}
+          >
+            <span className="transport-option-name">なし（通常/休日時給を使用）</span>
+            {record?.special_hourly_rate == null && <span className="transport-check">✓</span>}
+          </div>
+          {(specialWagePatterns || []).map(p => (
+            <div
+              key={p.id}
+              className={`transport-option${record?.special_wage_id === p.id ? ' selected' : ''}`}
+              onClick={() => selectSpecialWage(p.id, p.hourly_rate, p.night_enabled !== false)}
+            >
+              <span className="transport-option-name">{p.name}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="transport-option-fee">
+                  ¥{p.hourly_rate.toLocaleString()}
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 4 }}>
+                    {p.night_enabled !== false ? '深夜あり' : '深夜なし'}
+                  </span>
+                </span>
+                {record?.special_wage_id === p.id && <span className="transport-check">✓</span>}
+              </div>
+            </div>
+          ))}
+          <div className="transport-free-input">
+            <label>フリー入力</label>
+            <input
+              type="number"
+              placeholder="時給（円）"
+              value={freeSpecialRate}
+              onChange={e => setFreeSpecialRate(e.target.value)}
+              style={{ width: '100%' }}
+            />
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ width: 'auto', padding: '10px 16px' }}
+              onClick={submitFreeSpecialRate}
+              disabled={saving}
+            >
+              次へ
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* 特別時給フリー入力の深夜割増ポップアップ */}
+      {showSpecialNightPopup && (
+        <div className="popup-overlay">
+          <div className="popup" style={{ width: 300 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>深夜割増を適用しますか？</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+              特別時給 ¥{pendingSpecialRate?.toLocaleString()} に深夜割増を適用するか選択してください。
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => confirmFreeSpecial(false)}>適用しない</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => confirmFreeSpecial(true)}>適用する</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 時刻編集シート */}

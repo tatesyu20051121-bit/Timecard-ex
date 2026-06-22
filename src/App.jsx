@@ -66,6 +66,7 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [wageHistory, setWageHistory] = useState([])
+  const [specialWagePatterns, setSpecialWagePatterns] = useState([])
   const [tab, setTab] = useState('clock')
   const [sharedYearMonth, setSharedYearMonth] = useState(currentYearMonth())
   const [logs, setLogs] = useState([
@@ -132,9 +133,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!session) { setProfile(null); setWageHistory([]); return }
+    if (!session) { setProfile(null); setWageHistory([]); setSpecialWagePatterns([]); return }
     loadProfile()
     loadWageHistory()
+    loadSpecialWagePatterns()
   }, [session])
 
   async function loadProfile() {
@@ -149,6 +151,15 @@ export default function App() {
       .eq('user_id', session.user.id)
       .order('effective_date')
     setWageHistory(data || [])
+  }
+
+  async function loadSpecialWagePatterns() {
+    const { data } = await supabase
+      .from('special_wage_patterns')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at')
+    setSpecialWagePatterns(data || [])
   }
 
   const errorLogs = logs.filter(l => /err|miss|fail/i.test(l))
@@ -185,7 +196,7 @@ export default function App() {
   return (
     <>
       {tab === 'clock' && <ClockScreen session={session} profile={profile} setTab={setTab} />}
-      {tab === 'calendar' && <CalendarScreen session={session} profile={profile} wageHistory={wageHistory} yearMonth={sharedYearMonth} setYearMonth={setSharedYearMonth} />}
+      {tab === 'calendar' && <CalendarScreen session={session} profile={profile} wageHistory={wageHistory} specialWagePatterns={specialWagePatterns} yearMonth={sharedYearMonth} setYearMonth={setSharedYearMonth} />}
       {tab === 'salary' && <SalaryScreen session={session} profile={profile} wageHistory={wageHistory} yearMonth={sharedYearMonth} setYearMonth={setSharedYearMonth} />}
       {tab === 'settings' && (
         <SettingsScreen
@@ -194,6 +205,8 @@ export default function App() {
           onProfileUpdated={loadProfile}
           wageHistory={wageHistory}
           onWageHistoryUpdated={loadWageHistory}
+          specialWagePatterns={specialWagePatterns}
+          onSpecialWagePatternsUpdated={loadSpecialWagePatterns}
         />
       )}
       <BottomNav tab={tab} setTab={setTab} />
