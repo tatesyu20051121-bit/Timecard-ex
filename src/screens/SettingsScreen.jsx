@@ -296,15 +296,19 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   // 特別時給パターン
   async function addSpecialPattern() {
     const rate = parseInt(specialPatternRate)
-    if (!specialPatternName.trim() || isNaN(rate) || rate < 0) return
+    if (!specialPatternName.trim() || isNaN(rate) || rate < 0) {
+      alert(`入力を確認してください\n名前: "${specialPatternName}"\n時給: "${specialPatternRate}"`)
+      return
+    }
     if ((specialWagePatterns || []).length >= 6) { alert('パターンは最大6個まで登録できます'); return }
     setSaving(true)
-    await supabase.from('special_wage_patterns').insert({
+    const { error } = await supabase.from('special_wage_patterns').insert({
       user_id: session.user.id,
       name: specialPatternName.trim(),
       hourly_rate: rate,
       night_enabled: specialPatternNight,
     })
+    if (error) { alert('保存エラー: ' + error.message); setSaving(false); return }
     await onSpecialWagePatternsUpdated()
     setSpecialPatternName(''); setSpecialPatternRate(''); setSpecialPatternNight(true)
     setSaving(false)
