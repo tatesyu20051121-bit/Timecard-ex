@@ -34,11 +34,22 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   const [specialPatternName, setSpecialPatternName] = useState('')
   const [specialPatternRate, setSpecialPatternRate] = useState('')
   const [specialPatternNight, setSpecialPatternNight] = useState(true)
+  const [localSpecialPatterns, setLocalSpecialPatterns] = useState(specialWagePatterns || [])
   const [patternName, setPatternName] = useState('')
   const [patternFee, setPatternFee] = useState('')
   const [accountName, setAccountName] = useState(profile.name)
 
-  useEffect(() => { loadPatterns(); loadBonusPatterns(); loadHistory() }, [])
+  useEffect(() => { loadPatterns(); loadBonusPatterns(); loadHistory(); loadLocalSpecialPatterns() }, [])
+
+  async function loadLocalSpecialPatterns() {
+    const { data } = await supabase
+      .from('special_wage_patterns')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at')
+    setLocalSpecialPatterns(data || [])
+    if (onSpecialWagePatternsUpdated) onSpecialWagePatternsUpdated()
+  }
 
   async function loadPatterns() {
     const { data } = await supabase
@@ -300,7 +311,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
       alert(`入力を確認してください\n名前: "${specialPatternName}"\n時給: "${specialPatternRate}"`)
       return
     }
-    if ((specialWagePatterns || []).length >= 6) { alert('パターンは最大6個まで登録できます'); return }
+    if (localSpecialPatterns.length >= 6) { alert('パターンは最大6個まで登録できます'); return }
     setSaving(true)
     const { error } = await supabase.from('special_wage_patterns').insert({
       user_id: session.user.id,
@@ -309,7 +320,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
       night_enabled: specialPatternNight,
     })
     if (error) { alert('保存エラー: ' + error.message); setSaving(false); return }
-    await onSpecialWagePatternsUpdated()
+    await loadLocalSpecialPatterns()
     setSpecialPatternName(''); setSpecialPatternRate(''); setSpecialPatternNight(true)
     setSaving(false)
     setSheet(null)
@@ -324,7 +335,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
       hourly_rate: rate,
       night_enabled: specialPatternNight,
     }).eq('id', editSpecialPattern.id)
-    await onSpecialWagePatternsUpdated()
+    await loadLocalSpecialPatterns()
     setSaving(false)
     setSheet(null)
   }
@@ -332,7 +343,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   async function deleteSpecialPattern(id) {
     if (!window.confirm('このパターンを削除しますか？')) return
     await supabase.from('special_wage_patterns').delete().eq('id', id)
-    await onSpecialWagePatternsUpdated()
+    await loadLocalSpecialPatterns()
     setSheet(null)
   }
 
@@ -461,7 +472,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           特別時給はその日の通常時給・休日時給より優先されます。<br />優先順位：特別時給 ＞ 休日時給 ＞ 通常時給
         </div>
         <div className="settings-card">
-          {(specialWagePatterns || []).map(p => (
+          {localSpecialPatterns.map(p => (
             <div key={p.id} className="settings-row" onClick={() => openEditSpecialPattern(p)}>
               <span className="settings-row-label">{p.name}</span>
               <div className="settings-row-right">
