@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase.js'
+import { currentYearMonth } from './lib/timeUtils.js'
 import AuthScreen from './screens/AuthScreen.jsx'
 import ClockScreen from './screens/ClockScreen.jsx'
 import CalendarScreen from './screens/CalendarScreen.jsx'
@@ -66,6 +67,7 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [wageHistory, setWageHistory] = useState([])
   const [tab, setTab] = useState('clock')
+  const [sharedYearMonth, setSharedYearMonth] = useState(currentYearMonth())
   const [logs, setLogs] = useState([
     `S:${INIT_SEARCH || '(なし)'}`,
     `H:${INIT_HASH ? INIT_HASH.substring(0, 30) : '(なし)'}`,
@@ -183,8 +185,8 @@ export default function App() {
   return (
     <>
       {tab === 'clock' && <ClockScreen session={session} profile={profile} setTab={setTab} />}
-      {tab === 'calendar' && <CalendarScreen session={session} profile={profile} wageHistory={wageHistory} />}
-      {tab === 'salary' && <SalaryScreen session={session} profile={profile} wageHistory={wageHistory} />}
+      {tab === 'calendar' && <CalendarScreen session={session} profile={profile} wageHistory={wageHistory} yearMonth={sharedYearMonth} setYearMonth={setSharedYearMonth} />}
+      {tab === 'salary' && <SalaryScreen session={session} profile={profile} wageHistory={wageHistory} yearMonth={sharedYearMonth} setYearMonth={setSharedYearMonth} />}
       {tab === 'settings' && (
         <SettingsScreen
           session={session}

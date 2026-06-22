@@ -8,8 +8,7 @@ import {
   getWageForDate, isJapaneseHoliday
 } from '../lib/timeUtils.js'
 
-export default function CalendarScreen({ session, profile, wageHistory }) {
-  const [yearMonth, setYearMonth] = useState(currentYearMonth())
+export default function CalendarScreen({ session, profile, wageHistory, yearMonth, setYearMonth }) {
   const [records, setRecords] = useState({})
   const [patterns, setPatterns] = useState([])
   const [bonusPatterns, setBonusPatterns] = useState([])

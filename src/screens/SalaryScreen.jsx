@@ -5,8 +5,7 @@ import {
   minutesToDisplay, calcMonthPay
 } from '../lib/timeUtils.js'
 
-export default function SalaryScreen({ session, profile, wageHistory }) {
-  const [yearMonth, setYearMonth] = useState(currentYearMonth())
+export default function SalaryScreen({ session, profile, wageHistory, yearMonth, setYearMonth }) {
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -97,7 +96,7 @@ export default function SalaryScreen({ session, profile, wageHistory }) {
             </div>
             {profile.night_enabled !== false && (
               <div className="salary-row">
-                <span className="salary-label">深夜時間（{profile.night_start}〜{profile.night_end}）</span>
+                <span className="salary-label">深夜時間（{profile.night_start?.slice(0,5)}〜{profile.night_end?.slice(0,5)}）</span>
                 <span className="salary-value">{minutesToDisplay(result.totalNightMinutes)}</span>
               </div>
             )}

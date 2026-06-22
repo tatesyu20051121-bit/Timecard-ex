@@ -139,8 +139,8 @@ export function calcDayPay(record, settings, wageHistory = null) {
     const rateForDate = getWageForDate(wageHistory, record.date)
     if (rateForDate !== null) {
       hourly_rate = rateForDate
-    } else if (wageHistory.length > 0) {
-      // wage_historyはあるが対応する時給が見つからない（設定前の日付）
+    } else {
+      // wage_historyがあるが対応する時給が見つからない（全削除 or 設定前の日付）
       hasWage = false
     }
   }
