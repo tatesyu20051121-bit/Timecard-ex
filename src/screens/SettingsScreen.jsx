@@ -729,7 +729,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           </div>
           <div className="form-field">
             <label className="form-label">パターン名</label>
-            <input type="text" value={specialPatternName} onChange={e => setSpecialPatternName(e.target.value)} placeholder="例：他店ヘルプ" />
+            <input type="text" value={specialPatternName} onChange={e => setSpecialPatternName(e.target.value)} placeholder="例：○○イベント" />
           </div>
           <div className="form-field">
             <label className="form-label">時給（円）</label>
