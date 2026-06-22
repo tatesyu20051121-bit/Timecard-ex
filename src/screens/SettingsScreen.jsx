@@ -25,7 +25,9 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   const [satRate, setSatRate] = useState(profile.sat_hourly_rate ? String(profile.sat_hourly_rate) : '')
   const [sunRate, setSunRate] = useState(profile.sun_hourly_rate ? String(profile.sun_hourly_rate) : '')
   const [holRate, setHolRate] = useState(profile.hol_hourly_rate ? String(profile.hol_hourly_rate) : '')
-  const [holidayNightEnabled, setHolidayNightEnabled] = useState(profile.holiday_night_enabled !== false)
+  const [satNightEnabled, setSatNightEnabled] = useState(profile.sat_night_enabled !== false)
+  const [sunNightEnabled, setSunNightEnabled] = useState(profile.sun_night_enabled !== false)
+  const [holNightEnabled, setHolNightEnabled] = useState(profile.hol_night_enabled !== false)
   const [patternName, setPatternName] = useState('')
   const [patternFee, setPatternFee] = useState('')
   const [accountName, setAccountName] = useState(profile.name)
@@ -116,8 +118,11 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
     if (remaining.length > 0) {
       const latest = remaining.reduce((a, b) => a.effective_date > b.effective_date ? a : b)
       await supabase.from('profiles').update({ hourly_rate: latest.hourly_rate }).eq('id', session.user.id)
-      await onProfileUpdated()
+    } else {
+      // 全削除時は hourly_rate を null にリセット
+      await supabase.from('profiles').update({ hourly_rate: null }).eq('id', session.user.id)
     }
+    await onProfileUpdated()
     await onWageHistoryUpdated()
     setDeleteTarget(null)
   }
@@ -172,7 +177,9 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
       updates.sat_hourly_rate = satRate ? parseInt(satRate) : null
       updates.sun_hourly_rate = sunRate ? parseInt(sunRate) : null
       updates.hol_hourly_rate = holRate ? parseInt(holRate) : null
-      updates.holiday_night_enabled = holidayNightEnabled
+      updates.sat_night_enabled = satNightEnabled
+      updates.sun_night_enabled = sunNightEnabled
+      updates.hol_night_enabled = holNightEnabled
     }
     await supabase.from('profiles').update(updates).eq('id', session.user.id)
     await onProfileUpdated()
@@ -262,7 +269,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   const sortedWageHistory = [...wageHistory].sort((a, b) => a.effective_date.localeCompare(b.effective_date))
   const currentDisplayRate = sortedWageHistory.length > 0
     ? sortedWageHistory[sortedWageHistory.length - 1].hourly_rate
-    : profile.hourly_rate
+    : null
 
   const fieldLabels = {
     clock_in: '出勤', clock_out: '退勤', break_start: '休憩開始', break_end: '休憩終了',
@@ -283,7 +290,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           <div className="settings-row" onClick={() => { setWage(''); setWageEffectiveDate(today()); setSheet('wage') }}>
             <span className="settings-row-label">時給</span>
             <div className="settings-row-right">
-              <span className="settings-row-value">¥{currentDisplayRate.toLocaleString()}</span>
+              <span className="settings-row-value">{currentDisplayRate !== null ? `¥${currentDisplayRate.toLocaleString()}` : '未設定'}</span>
               <span className="settings-chevron">›</span>
             </div>
           </div>
@@ -314,7 +321,9 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
             setSatRate(profile.sat_hourly_rate ? String(profile.sat_hourly_rate) : '')
             setSunRate(profile.sun_hourly_rate ? String(profile.sun_hourly_rate) : '')
             setHolRate(profile.hol_hourly_rate ? String(profile.hol_hourly_rate) : '')
-            setHolidayNightEnabled(profile.holiday_night_enabled !== false)
+            setSatNightEnabled(profile.sat_night_enabled !== false)
+            setSunNightEnabled(profile.sun_night_enabled !== false)
+            setHolNightEnabled(profile.hol_night_enabled !== false)
             setSheet('holiday')
           }}>
             <span className="settings-row-label">休日時給</span>
@@ -464,26 +473,63 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           </div>
           {holidayEnabled && (
             <>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>空欄の場合は通常時給を使用します</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>時給は空欄の場合、通常時給を使用します</div>
+
+              {/* 土曜 */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1565c0', marginBottom: 8 }}>土曜</div>
+              </div>
               <div className="form-field">
                 <label className="form-label">土曜時給（円）</label>
                 <input type="number" value={satRate} onChange={e => setSatRate(e.target.value)} placeholder="例：1200" />
               </div>
+              {profile.night_enabled !== false && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <span style={{ fontSize: 14 }}>深夜割増を適用する</span>
+                  <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
+                    <input type="checkbox" checked={satNightEnabled} onChange={e => setSatNightEnabled(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+                    <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: satNightEnabled ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
+                      <span style={{ position: 'absolute', width: 22, height: 22, left: satNightEnabled ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {/* 日曜 */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#e53935', marginBottom: 8 }}>日曜</div>
+              </div>
               <div className="form-field">
                 <label className="form-label">日曜時給（円）</label>
                 <input type="number" value={sunRate} onChange={e => setSunRate(e.target.value)} placeholder="例：1300" />
+              </div>
+              {profile.night_enabled !== false && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <span style={{ fontSize: 14 }}>深夜割増を適用する</span>
+                  <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
+                    <input type="checkbox" checked={sunNightEnabled} onChange={e => setSunNightEnabled(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+                    <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: sunNightEnabled ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
+                      <span style={{ position: 'absolute', width: 22, height: 22, left: sunNightEnabled ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {/* 祝日 */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#e53935', marginBottom: 8 }}>祝日</div>
               </div>
               <div className="form-field">
                 <label className="form-label">祝日時給（円）</label>
                 <input type="number" value={holRate} onChange={e => setHolRate(e.target.value)} placeholder="例：1400" />
               </div>
               {profile.night_enabled !== false && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 4 }}>
-                  <span style={{ fontSize: 14 }}>休日時給にも深夜割増を適用する</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 14 }}>深夜割増を適用する</span>
                   <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
-                    <input type="checkbox" checked={holidayNightEnabled} onChange={e => setHolidayNightEnabled(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
-                    <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: holidayNightEnabled ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
-                      <span style={{ position: 'absolute', width: 22, height: 22, left: holidayNightEnabled ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
+                    <input type="checkbox" checked={holNightEnabled} onChange={e => setHolNightEnabled(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+                    <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: holNightEnabled ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
+                      <span style={{ position: 'absolute', width: 22, height: 22, left: holNightEnabled ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
                     </span>
                   </label>
                 </div>

@@ -147,6 +147,7 @@ export function calcDayPay(record, settings, wageHistory = null) {
 
   // 休日時給チェック（通常時給を上書き）
   let isHolidayRate = false
+  let holidayNightEnabled = true // この日の深夜割増適用フラグ
   if (hasWage && settings.holiday_enabled && record.date) {
     const d = new Date(record.date + 'T00:00:00')
     const dow = d.getDay()
@@ -154,12 +155,15 @@ export function calcDayPay(record, settings, wageHistory = null) {
     if (isHol && settings.hol_hourly_rate) {
       hourly_rate = settings.hol_hourly_rate
       isHolidayRate = true
+      holidayNightEnabled = settings.hol_night_enabled !== false
     } else if (dow === 0 && settings.sun_hourly_rate) {
       hourly_rate = settings.sun_hourly_rate
       isHolidayRate = true
+      holidayNightEnabled = settings.sun_night_enabled !== false
     } else if (dow === 6 && settings.sat_hourly_rate) {
       hourly_rate = settings.sat_hourly_rate
       isHolidayRate = true
+      holidayNightEnabled = settings.sat_night_enabled !== false
     }
   }
 
@@ -200,9 +204,9 @@ export function calcDayPay(record, settings, wageHistory = null) {
     return { workMinutes: 0, nightMinutes: 0, regularMinutes: 0, pay: 0, nightBonus: 0, transportFee: transport_fee || 0, bonusFee: bonus_fee || 0, totalPay: (transport_fee || 0) + (bonus_fee || 0) }
   }
 
-  // 深夜割増：休日時給の日は holiday_night_enabled が false の場合スキップ
+  // 深夜割増：休日時給の日は曜日別の night_enabled を使用
   const nightEnabled = settings.night_enabled !== false &&
-    (!isHolidayRate || settings.holiday_night_enabled !== false)
+    (!isHolidayRate || holidayNightEnabled)
   const nightMin = nightEnabled ? calcNightMinutes(inMin, outMin, night_start, night_end) : 0
   const regularMin = totalWorkMinutes - Math.min(nightMin, totalWorkMinutes)
 

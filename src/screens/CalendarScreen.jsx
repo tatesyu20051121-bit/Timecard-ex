@@ -73,6 +73,9 @@ export default function CalendarScreen({ session, profile, wageHistory, yearMont
     sun_hourly_rate: profile.sun_hourly_rate || null,
     hol_hourly_rate: profile.hol_hourly_rate || null,
     holiday_night_enabled: profile.holiday_night_enabled !== false,
+    sat_night_enabled: profile.sat_night_enabled !== false,
+    sun_night_enabled: profile.sun_night_enabled !== false,
+    hol_night_enabled: profile.hol_night_enabled !== false,
   }
   const dayCalc = record ? calcDayPay(record, settings, wageHistory) : null
 
