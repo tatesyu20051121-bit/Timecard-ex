@@ -248,9 +248,10 @@ button { cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: tra
 .cal-cell.worked { background: #c8e6c9; }
 .cal-cell.no-wage { background: #e0f7fa; }
 .cal-cell.incomplete { background: #fff8e1; }
-.cal-cell.selected { background: #2e7d32; color: #fff !important; font-weight: 600; }
+.cal-cell.selected { background: #2e7d32; font-weight: 600; }
+.cal-cell.selected .cal-day-num { color: #fff !important; }
 .cal-cell.today:not(.selected) { border: 2px solid #2e7d32; font-weight: 600; }
-.cal-cell.other-month { opacity: 0.35; }
+.cal-cell.other-month .cal-day-num { opacity: 0.35; }
 
 .cal-detail {
   margin: 12px 16px 0;

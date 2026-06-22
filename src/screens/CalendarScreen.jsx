@@ -32,9 +32,12 @@ export default function CalendarScreen({ session, profile, wageHistory, specialW
   useEffect(() => { loadPatterns(); loadBonusPatterns() }, [])
 
   async function loadRecords() {
-    const [y, m] = yearMonth.split('-')
-    const start = `${yearMonth}-01`
-    const end = `${yearMonth}-${new Date(+y, +m, 0).getDate().toString().padStart(2, '0')}`
+    // 前月・当月・翌月の3ヶ月分を取得（カレンダーに表示される他月日付も色付けするため）
+    const prev = prevMonth(yearMonth)
+    const next = nextMonth(yearMonth)
+    const [ny, nm] = next.split('-')
+    const start = `${prev}-01`
+    const end = `${next}-${new Date(+ny, +nm, 0).getDate().toString().padStart(2, '0')}`
     const { data } = await supabase
       .from('time_logs')
       .select('*')
@@ -283,8 +286,14 @@ export default function CalendarScreen({ session, profile, wageHistory, specialW
           {days.map((day) => {
             const rec = records[day.date]
             const isWorked = !!rec && (rec.clock_in || rec.clock_out)
-            const isIncomplete = isWorked && ((rec.clock_in && !rec.clock_out) || (rec.break_start && !rec.break_end))
-            const isNoWage = isWorked && !isIncomplete && wageHistory.length > 0 && getWageForDate(wageHistory, day.date) === null
+            const hasAnyData = !!rec && (rec.clock_in || rec.clock_out || rec.break_start || rec.break_end)
+            const isIncomplete = hasAnyData && (
+              (rec.clock_in && !rec.clock_out) ||   // 出勤あり・退勤なし
+              (!rec.clock_in && rec.clock_out) ||   // 退勤あり・出勤なし
+              (rec.break_start && !rec.break_end) || // 休憩入りあり・戻りなし
+              (!rec.break_start && rec.break_end)    // 休憩戻りあり・入りなし
+            )
+            const isNoWage = isWorked && !isIncomplete && getWageForDate(wageHistory, day.date) === null
             const isSelected = day.date === selectedDate
             const isToday = day.date === todayStr
             const isHoliday = isJapaneseHoliday(day.date)
@@ -310,7 +319,6 @@ export default function CalendarScreen({ session, profile, wageHistory, specialW
               <div
                 key={day.date}
                 className={cls}
-                style={numColor ? { color: numColor } : undefined}
                 onClick={() => {
                   if (day.date === selectedDate) {
                     openTimeEdit()
@@ -319,7 +327,9 @@ export default function CalendarScreen({ session, profile, wageHistory, specialW
                   }
                 }}
               >
-                {day.day}
+                <span className="cal-day-num" style={numColor ? { color: numColor } : undefined}>
+                  {day.day}
+                </span>
               </div>
             )
           })}
