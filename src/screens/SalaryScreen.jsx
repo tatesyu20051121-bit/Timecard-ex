@@ -32,6 +32,11 @@ export default function SalaryScreen({ session, profile, wageHistory, yearMonth,
     night_end: profile.night_end,
     night_rate: profile.night_rate,
     night_enabled: profile.night_enabled !== false,
+    holiday_enabled: profile.holiday_enabled === true,
+    sat_hourly_rate: profile.sat_hourly_rate || null,
+    sun_hourly_rate: profile.sun_hourly_rate || null,
+    hol_hourly_rate: profile.hol_hourly_rate || null,
+    holiday_night_enabled: profile.holiday_night_enabled !== false,
   }
 
   const result = calcMonthPay(records, settings, wageHistory)
@@ -120,7 +125,7 @@ export default function SalaryScreen({ session, profile, wageHistory, yearMonth,
               <span className="salary-value">¥{result.totalTransport.toLocaleString()}</span>
             </div>
             <div className="salary-row">
-              <span className="salary-label">ボーナス</span>
+              <span className="salary-label">固定ボーナス</span>
               <span className="salary-value">¥{result.totalBonus.toLocaleString()}</span>
             </div>
             <div className="salary-total-row">
@@ -149,7 +154,7 @@ export default function SalaryScreen({ session, profile, wageHistory, yearMonth,
                       <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
                         {minutesToDisplay(d.totalWorkMinutes)}
                         {r.transport_fee ? ` ＋交通費¥${r.transport_fee}` : ''}
-                        {r.bonus_fee ? ` ＋ボーナス¥${r.bonus_fee}` : ''}
+                        {r.bonus_fee ? ` ＋固定ボーナス¥${r.bonus_fee}` : ''}
                       </span>
                     </div>
                   </div>

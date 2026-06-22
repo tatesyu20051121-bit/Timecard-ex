@@ -68,6 +68,11 @@ export default function CalendarScreen({ session, profile, wageHistory, yearMont
     night_end: profile.night_end,
     night_rate: profile.night_rate,
     night_enabled: profile.night_enabled !== false,
+    holiday_enabled: profile.holiday_enabled === true,
+    sat_hourly_rate: profile.sat_hourly_rate || null,
+    sun_hourly_rate: profile.sun_hourly_rate || null,
+    hol_hourly_rate: profile.hol_hourly_rate || null,
+    holiday_night_enabled: profile.holiday_night_enabled !== false,
   }
   const dayCalc = record ? calcDayPay(record, settings, wageHistory) : null
 
@@ -370,7 +375,7 @@ export default function CalendarScreen({ session, profile, wageHistory, yearMont
 
           {/* ボーナス */}
           <div className="detail-row">
-            <span className="detail-label">ボーナス</span>
+            <span className="detail-label">固定ボーナス</span>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               {displayBonusFee != null ? (
                 <>
@@ -427,7 +432,7 @@ export default function CalendarScreen({ session, profile, wageHistory, yearMont
 
       {/* ボーナス選択シート */}
       {showBonus && (
-        <BottomSheet title="ボーナスを選択" onClose={() => { setShowBonus(false); setFreeBonus('') }}>
+        <BottomSheet title="固定ボーナスを選択" onClose={() => { setShowBonus(false); setFreeBonus('') }}>
           {/* なしオプション */}
           <div
             className={`transport-option${displayBonusFee === null ? ' selected' : ''}`}

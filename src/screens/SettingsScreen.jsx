@@ -21,6 +21,11 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   const [nightStart, setNightStart] = useState(profile.night_start)
   const [nightEnd, setNightEnd] = useState(profile.night_end)
   const [nightRate, setNightRate] = useState(String(Math.round((profile.night_rate - 1) * 100)))
+  const [holidayEnabled, setHolidayEnabled] = useState(profile.holiday_enabled === true)
+  const [satRate, setSatRate] = useState(profile.sat_hourly_rate ? String(profile.sat_hourly_rate) : '')
+  const [sunRate, setSunRate] = useState(profile.sun_hourly_rate ? String(profile.sun_hourly_rate) : '')
+  const [holRate, setHolRate] = useState(profile.hol_hourly_rate ? String(profile.hol_hourly_rate) : '')
+  const [holidayNightEnabled, setHolidayNightEnabled] = useState(profile.holiday_night_enabled !== false)
   const [patternName, setPatternName] = useState('')
   const [patternFee, setPatternFee] = useState('')
   const [accountName, setAccountName] = useState(profile.name)
@@ -160,6 +165,21 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
     setSheet(null)
   }
 
+  async function saveHoliday() {
+    setSaving(true)
+    const updates = { holiday_enabled: holidayEnabled }
+    if (holidayEnabled) {
+      updates.sat_hourly_rate = satRate ? parseInt(satRate) : null
+      updates.sun_hourly_rate = sunRate ? parseInt(sunRate) : null
+      updates.hol_hourly_rate = holRate ? parseInt(holRate) : null
+      updates.holiday_night_enabled = holidayNightEnabled
+    }
+    await supabase.from('profiles').update(updates).eq('id', session.user.id)
+    await onProfileUpdated()
+    setSaving(false)
+    setSheet(null)
+  }
+
   // 交通費パターン
   async function addPattern() {
     const fee = parseInt(patternFee)
@@ -283,7 +303,25 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
             <div className="settings-row-right">
               <span className="settings-row-value">
                 {profile.night_enabled !== false
-                  ? `${profile.night_start}〜${profile.night_end} ×${profile.night_rate}`
+                  ? `${profile.night_start?.slice(0,5)}〜${profile.night_end?.slice(0,5)} ×${profile.night_rate}`
+                  : 'なし'}
+              </span>
+              <span className="settings-chevron">›</span>
+            </div>
+          </div>
+          <div className="settings-row" onClick={() => {
+            setHolidayEnabled(profile.holiday_enabled === true)
+            setSatRate(profile.sat_hourly_rate ? String(profile.sat_hourly_rate) : '')
+            setSunRate(profile.sun_hourly_rate ? String(profile.sun_hourly_rate) : '')
+            setHolRate(profile.hol_hourly_rate ? String(profile.hol_hourly_rate) : '')
+            setHolidayNightEnabled(profile.holiday_night_enabled !== false)
+            setSheet('holiday')
+          }}>
+            <span className="settings-row-label">休日時給</span>
+            <div className="settings-row-right">
+              <span className="settings-row-value">
+                {profile.holiday_enabled
+                  ? `ON`
                   : 'なし'}
               </span>
               <span className="settings-chevron">›</span>
@@ -308,8 +346,8 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
           </div>
         </div>
 
-        {/* ボーナスパターン */}
-        <div className="settings-section-label">ボーナスパターン</div>
+        {/* 固定ボーナスパターン */}
+        <div className="settings-section-label">固定ボーナスパターン</div>
         <div className="settings-card">
           {bonusPatterns.map(p => (
             <div key={p.id} className="settings-row" onClick={() => openEditBonusPattern(p)}>
@@ -412,6 +450,53 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
         </BottomSheet>
       )}
 
+      {/* 休日時給シート */}
+      {sheet === 'holiday' && (
+        <BottomSheet title="休日時給を設定" onClose={() => setSheet(null)}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>休日時給を適用する</span>
+            <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
+              <input type="checkbox" checked={holidayEnabled} onChange={e => setHolidayEnabled(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+              <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: holidayEnabled ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
+                <span style={{ position: 'absolute', width: 22, height: 22, left: holidayEnabled ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
+              </span>
+            </label>
+          </div>
+          {holidayEnabled && (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>空欄の場合は通常時給を使用します</div>
+              <div className="form-field">
+                <label className="form-label">土曜時給（円）</label>
+                <input type="number" value={satRate} onChange={e => setSatRate(e.target.value)} placeholder="例：1200" />
+              </div>
+              <div className="form-field">
+                <label className="form-label">日曜時給（円）</label>
+                <input type="number" value={sunRate} onChange={e => setSunRate(e.target.value)} placeholder="例：1300" />
+              </div>
+              <div className="form-field">
+                <label className="form-label">祝日時給（円）</label>
+                <input type="number" value={holRate} onChange={e => setHolRate(e.target.value)} placeholder="例：1400" />
+              </div>
+              {profile.night_enabled !== false && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 4 }}>
+                  <span style={{ fontSize: 14 }}>休日時給にも深夜割増を適用する</span>
+                  <label style={{ position: 'relative', display: 'inline-block', width: 50, height: 28 }}>
+                    <input type="checkbox" checked={holidayNightEnabled} onChange={e => setHolidayNightEnabled(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+                    <span style={{ position: 'absolute', cursor: 'pointer', inset: 0, background: holidayNightEnabled ? 'var(--primary)' : '#ccc', borderRadius: 28, transition: '0.3s' }}>
+                      <span style={{ position: 'absolute', width: 22, height: 22, left: holidayNightEnabled ? 24 : 3, bottom: 3, background: 'white', borderRadius: '50%', transition: '0.3s' }} />
+                    </span>
+                  </label>
+                </div>
+              )}
+            </>
+          )}
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <button className="btn btn-outline" onClick={() => setSheet(null)}>キャンセル</button>
+            <button className="btn btn-primary" onClick={saveHoliday} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
+          </div>
+        </BottomSheet>
+      )}
+
       {/* 交通費パターン追加シート */}
       {sheet === 'pattern-add' && (
         <BottomSheet title="交通費パターンを追加" onClose={() => setSheet(null)}>
@@ -452,9 +537,9 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
 
       {/* ボーナスパターン追加シート */}
       {sheet === 'bonus-pattern-add' && (
-        <BottomSheet title="ボーナスパターンを追加" onClose={() => setSheet(null)}>
+        <BottomSheet title="固定ボーナスパターンを追加" onClose={() => setSheet(null)}>
           <div className="form-field">
-            <label className="form-label">ボーナス名</label>
+            <label className="form-label">固定ボーナス名</label>
             <input type="text" value={patternName} onChange={e => setPatternName(e.target.value)} placeholder="例：他店ヘルプ" />
           </div>
           <div className="form-field">
@@ -470,9 +555,9 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
 
       {/* ボーナスパターン編集シート */}
       {sheet === 'bonus-pattern-edit' && editBonusPattern && (
-        <BottomSheet title="ボーナスパターンを編集" onClose={() => setSheet(null)}>
+        <BottomSheet title="固定ボーナスパターンを編集" onClose={() => setSheet(null)}>
           <div className="form-field">
-            <label className="form-label">ボーナス名</label>
+            <label className="form-label">固定ボーナス名</label>
             <input type="text" value={patternName} onChange={e => setPatternName(e.target.value)} />
           </div>
           <div className="form-field">
