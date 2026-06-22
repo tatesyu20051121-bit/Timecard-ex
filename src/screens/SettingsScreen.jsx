@@ -14,6 +14,8 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteHasShifts, setDeleteHasShifts] = useState(false)
+  const [deletePatternTarget, setDeletePatternTarget] = useState(null)
+  const [deletePatternUsed, setDeletePatternUsed] = useState(false)
 
   // フォーム値
   const [wage, setWage] = useState(String(profile.hourly_rate))
@@ -214,11 +216,37 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
     setSheet(null)
   }
 
-  async function deletePattern(id) {
-    if (!window.confirm('このパターンを削除しますか？')) return
-    await supabase.from('transport_patterns').delete().eq('id', id)
-    await loadPatterns()
+  async function deletePattern(pattern) {
+    const { count } = await supabase
+      .from('time_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', session.user.id)
+      .eq('transport_pattern_id', pattern.id)
+    setDeletePatternTarget(pattern)
+    setDeletePatternUsed((count || 0) > 0)
     setSheet(null)
+  }
+
+  async function confirmDeletePatternKeep() {
+    // 交通費の金額はそのまま、パターンIDだけ外す
+    await supabase.from('time_logs')
+      .update({ transport_pattern_id: null })
+      .eq('user_id', session.user.id)
+      .eq('transport_pattern_id', deletePatternTarget.id)
+    await supabase.from('transport_patterns').delete().eq('id', deletePatternTarget.id)
+    await loadPatterns()
+    setDeletePatternTarget(null)
+  }
+
+  async function confirmDeletePatternReset() {
+    // 交通費ごとリセット
+    await supabase.from('time_logs')
+      .update({ transport_fee: null, transport_pattern_id: null })
+      .eq('user_id', session.user.id)
+      .eq('transport_pattern_id', deletePatternTarget.id)
+    await supabase.from('transport_patterns').delete().eq('id', deletePatternTarget.id)
+    await loadPatterns()
+    setDeletePatternTarget(null)
   }
 
   function openEditPattern(p) {
@@ -651,7 +679,7 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
             <button className="btn btn-primary" onClick={updatePattern} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
           </div>
           <button className="btn btn-outline" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
-            onClick={() => deletePattern(editPattern.id)}>このパターンを削除する</button>
+            onClick={() => deletePattern(editPattern)}>このパターンを削除する</button>
         </BottomSheet>
       )}
 
@@ -836,6 +864,38 @@ export default function SettingsScreen({ session, profile, onProfileUpdated, wag
               <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>キャンセル</button>
               <button className="btn btn-danger" onClick={confirmDeleteWage}>削除する</button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* 交通費パターン削除確認ダイアログ */}
+      {deletePatternTarget && (
+        <div className="popup-overlay">
+          <div className="popup" style={{ width: 300 }}>
+            {deletePatternUsed ? (
+              <>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+                  「{deletePatternTarget.name}」を削除
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.6 }}>
+                  このパターンはすでに使用されています。このパターンが入力されている勤務日の交通費はそのまま保存しますか？
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button className="btn btn-primary" onClick={confirmDeletePatternKeep}>保存してパターン削除</button>
+                  <button className="btn btn-danger" onClick={confirmDeletePatternReset}>リセットしてパターン削除</button>
+                  <button className="btn btn-outline" onClick={() => setDeletePatternTarget(null)}>キャンセル</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>
+                  「{deletePatternTarget.name}」を削除しますか？
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn btn-outline" onClick={() => setDeletePatternTarget(null)}>キャンセル</button>
+                  <button className="btn btn-danger" onClick={confirmDeletePatternKeep}>削除する</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

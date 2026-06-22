@@ -87,22 +87,8 @@ export default function CalendarScreen({ session, profile, wageHistory, specialW
   }
   const dayCalc = record ? calcDayPay(record, settings, wageHistory) : null
 
-  // 交通費の前回値（前回引き継ぎあり）
-  function getLastTransport() {
-    const sorted = Object.keys(records).sort()
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      const r = records[sorted[i]]
-      if (r.date !== selectedDate && r.transport_fee != null) {
-        return { fee: r.transport_fee, patternId: r.transport_pattern_id }
-      }
-    }
-    return null
-  }
-
-  const lastTransport = getLastTransport()
-  const displayTransportFee = record?.transport_fee ?? lastTransport?.fee ?? null
-  const displayPatternId = record?.transport_pattern_id ?? lastTransport?.patternId ?? null
-  const isTransportFromLast = record?.transport_fee == null && lastTransport != null
+  const displayTransportFee = record?.transport_fee ?? null
+  const displayPatternId = record?.transport_pattern_id ?? null
 
   // ボーナスは前回引き継ぎなし
   const displayBonusFee = record?.bonus_fee ?? null
@@ -410,7 +396,6 @@ export default function CalendarScreen({ session, profile, wageHistory, specialW
                   <span className="transport-value">
                     {displayPatternId ? patternName(displayPatternId) + ' ' : ''}
                     ¥{displayTransportFee.toLocaleString()}
-                    {isTransportFromLast && <span className="prev-badge">前回</span>}
                   </span>
                   <button className="change-link" onClick={() => setShowTransport(true)}>変更</button>
                 </>
